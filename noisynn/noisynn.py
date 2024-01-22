@@ -95,6 +95,8 @@ def random_chooser(handles: dict, chosen: Chosen):
 def inject_noisy_nn(model: nn.Module, 
                     layers_name: Iterable[str], 
                     n_layers_inject_per_batch: int = 1,
+                    add_noise_fn: Optional[Callable]= None,
+                    debug_fn: Optional[Callable]= None,
                     inplace = True, 
                     verbose = True):
     if getattr(model, "is_noisy", False):
@@ -115,7 +117,7 @@ def inject_noisy_nn(model: nn.Module,
     max_idx = None
     for idx, (name, child) in enumerate(model.named_modules()):
         if name in layers_name:
-            handles[name] = (child.register_forward_hook(add_noise(name= name, chosen= chosen))) 
+            handles[name] = (child.register_forward_hook(add_noise(name= name, chosen= chosen, add_noise_fn= add_noise_fn, debug_fn= debug_fn))) 
             layers_name.remove(name)
             if verbose:
                 print(f"---NoisyNN instance injected onto layer {name}.---")
@@ -221,17 +223,23 @@ class noisy_nn:
     '''
     def __init__(self, 
                     model: nn.Module, 
-                    layers_name: Iterable[str] = ['stages.3.blocks.2','stages.2.blocks.26'], 
+                    layers_name: Iterable[str], 
                     n_layers_inject_per_batch: int = 1,
-
-                    verbose = True) -> None:
+                    add_noise_fn: Optional[Callable]= None,
+                    debug_fn: Optional[Callable]= None,
+                    verbose = True,
+                    *args, **kwargs) -> None:
         self.model = model
         self.layers_name = layers_name
         self.n_layers_inject_per_batch = n_layers_inject_per_batch
         self.verbose = verbose
+        self.add_noise_fn = add_noise_fn
+        self.debug_fn = debug_fn
 
     def __enter__(self):
-        self.model = inject_noisy_nn(self.model, self.layers_name, self.n_layers_inject_per_batch, True, self.verbose)
+        self.model = inject_noisy_nn(self.model, self.layers_name, 
+                                     self.n_layers_inject_per_batch, self.add_noise_fn, self.debug_fn,
+                                     True, self.verbose)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         return remove_noisy_nn(self.model, True, self.verbose)

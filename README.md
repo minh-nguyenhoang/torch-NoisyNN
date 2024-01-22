@@ -6,4 +6,4 @@ This implementation is inspired from [kytimmylai's implementation](https://githu
 
 This implementation using Pytorch's hook mechanism to alter the model behaviour, so you don't have to rewrite any of your model souce code. 
 
-Usage: tutorial.ipynb
+Usage: [tutorial.ipynb](https://github.com/minh-nguyenhoang/torch-NoisyNN/blob/main/tutorial.ipynb)
