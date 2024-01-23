@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from typing import Iterable
 import math
+import warnings
 
 ##################################################################################################################################
 ###########      Taken from https://github.com/kytimmylai/NoisyNN-PyTorch/blob/main/noisy_resnet.py#L11      #####################
@@ -73,3 +74,50 @@ def __default_debug_fn__(layer_name: str, chosen_layers_name: Iterable[str], mod
     '''
     if model.training:
         print(f'Layer {layer_name} is chosen!')
+
+
+#######################################################################################################################################
+#######################################################################################################################################
+
+def safety_checker(original, modified, strict = False):
+    if (not isinstance(original, torch.Tensor)) and type(original) == type(modified):
+        if isinstance(original, Iterable):
+            if strict:
+                assert len(original) == len(modified), f"Expect original ouput and modified output have same length, but got {len(original)} and {len(modified)}."
+            else:
+                if len(original) != len(modified):
+                    warnings.warn(f"Expect original ouput and modified output have same length, but got {len(original)} and {len(modified)}.")
+                    return False
+            for i in range(len(original)):
+                if strict:
+                    safety_checker(original[i], modified[i], strict)
+                else:
+                    if not safety_checker(original[i], modified[i], strict):
+                        return False
+        else:
+            if strict:
+                raise TypeError(f'''Got an unsupported type for safety checker from original and modified output: {type(original)} and {type(modified)}.\n
+                                    If you are sure with your implementation, disable safety checker by `disable_safety_check()` or `safety_check(level = 0)`''')
+            else:
+                warnings.warn(f'''Got an unsupported type for safety checker from original and modified output: {type(original)} and {type(modified)}.\n
+                                    If you are sure with your implementation, disable safety checker by `disable_safety_check()` or `safety_check(level = 0)`''')
+                return False
+    
+    elif isinstance(original, torch.Tensor) and isinstance(modified, torch.Tensor):
+        # assert isinstance(modified, torch.Tensor)
+        if strict:
+            assert original.shape == modified.shape, f"""Expect the shape of the original ouput and modified output would be the same,
+                                                                    but got {original.shape} and {modified.shape}."""
+        else:
+            warnings.warn(f"""Expect the shape of the original ouput and modified output would be the same,
+                                                                    but got {original.shape} and {modified.shape}.""")
+            return False        
+    else:
+        if strict:
+            raise TypeError(f'''Got an unsupported type for safety checker from original and modified output: {type(original)} and {type(modified)}.\n
+                                If you are sure with your implementation, disable safety checker by `disable_safety_check()` or `safety_check(level = 0)`''')
+        else:
+            warnings.warn(f'''Got an unsupported type for safety checker from original and modified output: {type(original)} and {type(modified)}.\n
+                                If you are sure with your implementation, disable safety checker by `disable_safety_check()` or `safety_check(level = 0)`''')
+            return False
+    return True

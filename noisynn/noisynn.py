@@ -5,7 +5,8 @@ import random
 import math
 import warnings
 from functools import wraps
-from .default_function import __default_add_noise_fn__, __default_debug_fn__
+from enum import Enum
+from .default_function import __default_add_noise_fn__, __default_debug_fn__, safety_checker
 
 
 
@@ -29,8 +30,13 @@ Current implementation follow the second line, but I still wrap the first line i
 
 DEBUG_MODE = False
 DEBUG_FALLBACK = False
-SAFETY_CHECK = True
+SAFETY_CHECK = 1
 
+
+class SAFETY_LEVEL(Enum):
+    NONE = 0
+    WARNING = 1
+    CRITICAL = 2
 
 class Chosen:
     '''
@@ -73,9 +79,11 @@ def add_noise(name, chosen: Chosen, add_noise_fn: Optional[Callable]= None, debu
                         warnings.warn("Due to exception occur with current debug function, fall back to default debug function.")
                         __default_debug_fn__(name, chosen.name, model, input, output)
 
-                if SAFETY_CHECK:
-                    assert output.shape == original_output.shape, f"""Expect the shape of the output after add noise should be the same as the original output,
-                                                                    but got {output.shape} and {original_output.shape}."""
+            if SAFETY_CHECK != SAFETY_LEVEL.NONE:
+                if SAFETY_CHECK == SAFETY_LEVEL.WARNING:
+                    safety_checker(original_output, output, False)
+                elif SAFETY_CHECK == SAFETY_LEVEL.CRITICAL:
+                    safety_checker(original_output, output, True)
         return output
     return hook
 
@@ -159,7 +167,13 @@ def remove_noisy_nn(model: nn.Module, inplace = True, verbose = True):
 
     return model
 
+def disable_debug_mode():
+    global DEBUG_MODE
+    DEBUG_MODE = False
 
+def enable_debug_mode():
+    global DEBUG_MODE
+    DEBUG_MODE = True
 
 class debug_mode:
     '''
@@ -184,9 +198,9 @@ class debug_mode:
         global DEBUG_FALLBACK
         self.original_mode = DEBUG_MODE
         if self.enabled:
-            DEBUG_MODE = True
+            enable_debug_mode()
         else:
-            DEBUG_MODE = False
+            disable_debug_mode()
 
         self.original_fallback = DEBUG_FALLBACK
         if self.fallback:
@@ -243,6 +257,51 @@ class noisy_nn:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         return remove_noisy_nn(self.model, True, self.verbose)
+
+    def __call__(self, func):
+        @wraps(func)
+        def inner(*args, **kwds):
+            with self:
+                return func(*args, **kwds)
+        return inner
+    
+def disable_safety_check():
+    global SAFETY_CHECK
+    SAFETY_CHECK = 0
+
+def enable_safety_check(strict_level:int = SAFETY_LEVEL.WARNING):
+    global SAFETY_CHECK
+    SAFETY_CHECK = strict_level
+
+class safety_check:
+    '''
+    Simple context manager and decorator for controling safety checker of NoisyNN. Usage:\n
+    Case 1:
+        ***Your code here***\n
+        with safety_check(level = ...):
+            ***Your code here***
+        ***Your code here***\n
+
+    Case 2:
+        @safety_check(level = ...)\n
+        def my_func(...):
+            ***Your code here***
+    '''
+    def __init__(self, level: int = SAFETY_LEVEL.WARNING) -> None:
+        self.level = level
+
+    def __enter__(self):
+        global SAFETY_CHECK
+        self.original_mode = SAFETY_CHECK
+        if self.level:
+            enable_safety_check(self.level)
+        else:
+            disable_safety_check()
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        global SAFETY_CHECK
+        SAFETY_CHECK = self.original_mode
 
     def __call__(self, func):
         @wraps(func)

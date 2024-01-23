@@ -4,6 +4,6 @@ From paper [NoisyNN: Exploring the Influence of Information Entropy Change in Le
 
 This implementation is inspired from [kytimmylai's implementation](https://github.com/kytimmylai/NoisyNN-PyTorch/tree/main)
 
-This implementation using Pytorch's hook mechanism to alter the model behaviour, so you don't have to rewrite any of your model souce code. 
+This implementation using Pytorch's hook mechanism to alter the model behaviour, so you don't have to rewrite any of your model source code. 
 
 Usage: [tutorial.ipynb](https://github.com/minh-nguyenhoang/torch-NoisyNN/blob/main/tutorial.ipynb)
